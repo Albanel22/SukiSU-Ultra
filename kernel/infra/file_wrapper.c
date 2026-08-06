@@ -20,6 +20,24 @@
 
 #include "infra/file_wrapper.h"
 
+/* 4.19 compat (fork Motorola/LineageOS) : ce noyau n'expose ni iopoll ni
+ * remap_file_range dans struct file_operations, contrairement à ce que
+ * LINUX_VERSION_CODE pourrait laisser penser. On contrôle ça explicitement
+ * plutôt que de se fier à la version : passe à 1 si un jour ce fichier sert
+ * sur un noyau qui les expose réellement. */
+#ifndef KSU_HAS_FOP_IOPOLL
+#define KSU_HAS_FOP_IOPOLL 0
+#endif
+#ifndef KSU_HAS_FOP_REMAP_FILE_RANGE
+#define KSU_HAS_FOP_REMAP_FILE_RANGE 0
+#endif
+
+#if KSU_HAS_FOP_REMAP_FILE_RANGE
+#ifndef REMAP_FILE_DEDUP
+#define REMAP_FILE_DEDUP (1 << 0)
+#endif
+#endif
+
 struct ksu_file_wrapper {
     struct file *orig;
     struct file_operations ops;
@@ -84,6 +102,7 @@ static ssize_t ksu_wrapper_write_iter(struct kiocb *iocb, struct iov_iter *iovi)
     return orig->f_op->write_iter(iocb, iovi);
 }
 
+#if KSU_HAS_FOP_IOPOLL
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 static int ksu_wrapper_iopoll(struct kiocb *kiocb, struct io_comp_batch *icb, unsigned int v)
 {
@@ -101,6 +120,7 @@ static int ksu_wrapper_iopoll(struct kiocb *kiocb, bool spin)
     return orig->f_op->iopoll(kiocb, spin);
 }
 #endif
+#endif /* KSU_HAS_FOP_IOPOLL */
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
 static int ksu_wrapper_iterate(struct file *fp, struct dir_context *dc)
@@ -302,6 +322,7 @@ static ssize_t ksu_wrapper_copy_file_range(struct file *file_in, loff_t pos_in, 
     return orig->f_op->copy_file_range(file_in, pos_in, orig, pos_out, len, flags);
 }
 
+#if KSU_HAS_FOP_REMAP_FILE_RANGE
 // no REMAP_FILE_DEDUP: use file_in
 // https://cs.android.com/android/kernel/superproject/+/common-android-mainline:common/fs/read_write.c;l=1598-1599;drc=398da7defe218d3e51b0f3bdff75147e28125b60
 // https://cs.android.com/android/kernel/superproject/+/common-android-mainline:common/fs/remap_range.c;l=403-404;drc=398da7defe218d3e51b0f3bdff75147e28125b60
@@ -320,6 +341,7 @@ static loff_t ksu_wrapper_remap_file_range(struct file *file_in, loff_t pos_in, 
         return orig->f_op->remap_file_range(orig, pos_in, file_out, pos_out, len, remap_flags);
     }
 }
+#endif /* KSU_HAS_FOP_REMAP_FILE_RANGE */
 
 static int ksu_wrapper_fadvise(struct file *fp, loff_t off1, loff_t off2, int flags)
 {
@@ -360,7 +382,9 @@ static struct ksu_file_wrapper *ksu_create_file_wrapper(struct file *fp)
     p->ops.write = fp->f_op->write ? ksu_wrapper_write : NULL;
     p->ops.read_iter = fp->f_op->read_iter ? ksu_wrapper_read_iter : NULL;
     p->ops.write_iter = fp->f_op->write_iter ? ksu_wrapper_write_iter : NULL;
+#if KSU_HAS_FOP_IOPOLL
     p->ops.iopoll = fp->f_op->iopoll ? ksu_wrapper_iopoll : NULL;
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
     p->ops.iterate = fp->f_op->iterate ? ksu_wrapper_iterate : NULL;
 #endif
@@ -391,7 +415,9 @@ static struct ksu_file_wrapper *ksu_create_file_wrapper(struct file *fp)
     p->ops.fallocate = fp->f_op->fallocate ? ksu_wrapper_fallocate : NULL;
     p->ops.show_fdinfo = fp->f_op->show_fdinfo ? ksu_wrapper_show_fdinfo : NULL;
     p->ops.copy_file_range = fp->f_op->copy_file_range ? ksu_wrapper_copy_file_range : NULL;
+#if KSU_HAS_FOP_REMAP_FILE_RANGE
     p->ops.remap_file_range = fp->f_op->remap_file_range ? ksu_wrapper_remap_file_range : NULL;
+#endif
     p->ops.fadvise = fp->f_op->fadvise ? ksu_wrapper_fadvise : NULL;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
