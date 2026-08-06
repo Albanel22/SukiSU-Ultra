@@ -19,7 +19,10 @@ endif
 
 kernelsu-objs += infra/file_wrapper.o
 kernelsu-objs += infra/event_queue.o
-kernelsu-objs += infra/seccomp_cache.o
+# 4.19 compat : exclu, redéfinit la struct interne privée seccomp_filter en
+# supposant un champ "cache" absent sur ce noyau (risque de corruption mémoire
+# si on le fait juste compiler sans corriger la disposition réelle en mémoire).
+#kernelsu-objs += infra/seccomp_cache.o
 kernelsu-objs += infra/su_mount_ns.o
 kernelsu-objs += infra/symbol_resolver.o
 
@@ -37,7 +40,12 @@ kernelsu-objs += runtime/boot_event.o
 kernelsu-objs += runtime/ksud_integration.o
 
 kernelsu-objs += selinux/selinux.o
-kernelsu-objs += selinux/rules.o
+# 4.19 compat : exclu, suppose l'architecture SELinux "selinux_policy"/RCU
+# (selinux_state.policy, policy_mutex) introduite bien après 4.19. Ce n'est
+# pas un renommage de champ, c'est un mécanisme entièrement différent sur ce
+# noyau. Si ksu_dup_sepolicy() s'avère appelée ailleurs (selinux.o/sepolicy.o),
+# il faudra un stub minimal à la place de cette exclusion complète.
+#kernelsu-objs += selinux/rules.o
 kernelsu-objs += selinux/sepolicy.o
 
 kernelsu-objs += sulog/event.o
