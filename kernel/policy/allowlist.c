@@ -16,6 +16,7 @@
 #include <linux/compiler_types.h>
 #include <linux/hashtable.h>
 #include <linux/kref.h>
+#include <linux/sched/task.h>
 
 #include "klog.h" // IWYU pragma: keep
 #include "ksu.h"
@@ -473,7 +474,8 @@ void ksu_persistent_allow_list()
         goto put_task;
     }
     cb->func = do_persistent_allow_list;
-    if (task_work_add(tsk, cb, TWA_RESUME)) {
+    /* 4.19 compat : task_work_add() prenait un bool (true/false) avant TWA_* (5.9+) */
+    if (task_work_add(tsk, cb, true)) {
         kfree(cb);
         pr_warn("save_allow_list add task_work failed\n");
     }
