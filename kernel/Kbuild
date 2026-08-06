@@ -46,7 +46,11 @@ kernelsu-objs += selinux/selinux.o
 # noyau. Si ksu_dup_sepolicy() s'avère appelée ailleurs (selinux.o/sepolicy.o),
 # il faudra un stub minimal à la place de cette exclusion complète.
 #kernelsu-objs += selinux/rules.o
-kernelsu-objs += selinux/sepolicy.o
+# 4.19 compat : exclu, manipule directement struct policydb dans sa forme
+# restructurée (flex_array pour te_avtab.htable, filename_trans_key/datum
+# différents, type_val_to_struct absent...). Couplé à rules.c ci-dessus,
+# même mécanisme de sauvegarde/restauration de policydb incompatible 4.19.
+#kernelsu-objs += selinux/sepolicy.o
 
 kernelsu-objs += sulog/event.o
 kernelsu-objs += sulog/fd.o
