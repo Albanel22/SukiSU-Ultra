@@ -1,5 +1,9 @@
 kernelsu-objs := core/init.o
 
+# 4.19 compat : stubs pour les symboles des fichiers exclus ci-dessous
+# (feature/selinux_hide.o, selinux/rules.o, infra/seccomp_cache.o)
+kernelsu-objs += compat/stubs.o
+
 kernelsu-objs += feature/kernel_umount.o
 kernelsu-objs += feature/sulog.o
 kernelsu-objs += feature/sucompat.o
