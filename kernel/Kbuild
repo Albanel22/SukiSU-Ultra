@@ -61,7 +61,11 @@ kernelsu-objs += supercall/supercall.o
 
 kernelsu-objs += feature/adb_root.o
 
-kernelsu-objs += feature/selinux_hide.o
+# 4.19 compat : exclu, même incompatibilité que selinux/rules.o et
+# selinux/sepolicy.o (selinux_state.status_lock/.status_page/.policy,
+# struct selinux_policy incomplet). Fonctionnalité de camouflage du statut
+# SELinux, absente sur ce noyau plutôt que réécrite à l'aveugle.
+#kernelsu-objs += feature/selinux_hide.o
 
 kernelsu-objs += feature/uts_spoof.o
 
