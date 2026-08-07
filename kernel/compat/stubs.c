@@ -19,6 +19,7 @@
 #include <linux/uaccess.h>
 
 struct seccomp_filter;
+struct path;
 
 void ksu_selinux_hide_init(void)
 {
@@ -52,4 +53,17 @@ int handle_sepolicy(void __user *user_data, u64 data_len)
 
 void ksu_seccomp_allow_cache(struct seccomp_filter *filter, int nr)
 {
+}
+
+/*
+ * path_umount() backporté depuis 5.9 nécessiterait de patcher fs/namespace.c
+ * du VRAI noyau (do_umount, real_mount, check_mnt sont des fonctions internes
+ * à ce fichier, non exposées au reste du noyau) — pas juste notre driver.
+ * On stub : la fonctionnalité "Umount modules" (camouflage des points de montage
+ * des modules face aux apps qui vérifient) ne sera pas active, mais le su de
+ * base n'est pas affecté.
+ */
+int path_umount(struct path *path, int flags)
+{
+    return -EOPNOTSUPP;
 }
