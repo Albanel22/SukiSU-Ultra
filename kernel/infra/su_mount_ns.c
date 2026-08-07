@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/syscalls.h>
 #include <linux/task_work.h>
+#include <linux/uaccess.h>
 #include <linux/version.h>
 #include <linux/mount.h>
 
@@ -21,8 +22,8 @@
 #include "infra/su_mount_ns.h"
 #include "util.h"
 
-extern int path_mount(const char *dev_name, struct path *path, const char *type_page, unsigned long flags,
-                      void *data_page);
+extern long do_mount(const char *dev_name, const char __user *dir_name, const char *type_page, unsigned long flags,
+                     void *data_page);
 
 #if defined(__aarch64__)
 extern long __arm64_sys_setns(const struct pt_regs *regs);
@@ -146,13 +147,16 @@ static void ksu_mnt_ns_individual(void)
     }
 
     // make root mount private
-    struct path root_path;
-    get_fs_root(current->fs, &root_path);
-    int pm_ret = path_mount(NULL, &root_path, NULL, MS_PRIVATE | MS_REC, NULL);
-    path_put(&root_path);
+    /* 4.19 compat : path_mount(struct path*, ...) n'existe pas avant 5.9 ; do_mount()
+     * attend une chaîne __user pour le point de montage. On utilise l'astuce classique
+     * set_fs(KERNEL_DS) pour lui passer une chaîne noyau ("/", la racine courante). */
+    mm_segment_t old_fs = get_fs();
+    set_fs(KERNEL_DS);
+    long pm_ret = do_mount(NULL, (const char __user *)"/", NULL, MS_PRIVATE | MS_REC, NULL);
+    set_fs(old_fs);
 
     if (pm_ret < 0) {
-        pr_err("failed to make root private, err: %d\n", pm_ret);
+        pr_err("failed to make root private, err: %ld\n", pm_ret);
     }
 }
 
